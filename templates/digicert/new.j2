@@ -1,0 +1,20 @@
+---
+certificate:
+  common_name: "{{ common_name }}"
+  dns_names: {{ san_names | default(common_name,true) }}
+  csr: "{{ csr }}"
+  server_platform:
+    id: {{ digicert_certificate_server_platform }}
+  signature_hash: sha256
+  organization_units:
+    - "{{ digicert_organization_units }}"
+validity_years: 1
+comments: Ansible Certificate request
+locale: en
+skip_approval: true
+organization:
+  id: {{ digicert_certificate_organization_id }}
+additional_emails: 
+  - {{ certificate_additional_email_addresses | default(certificate_csr.email_address,true) }}
+      
+

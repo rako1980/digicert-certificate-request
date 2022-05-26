@@ -1,0 +1,49 @@
+---
+- assert:
+    that:
+      - common_name is defined
+
+- name: Display json data for certificate request call
+  debug:
+    msg: "{{ lookup('template', 'digicert/new.j2') }}"
+
+- name: Request new certificate to Digicert with given CSR
+  uri:
+    url: "{{ digicert_url }}/order/certificate/{{ digicert_standard_certificate }}"
+    method: POST
+    return_content: yes
+    headers:
+      Content-Type: application/json
+      X-DC-DEVKEY: "{{ digicert_api_key }}"
+    body_format: json
+    body: "{{ lookup('template', 'digicert/new.j2') | from_yaml }}"
+    status_code: 201
+  register: digicert_request_result
+  
+- name: debug | certificate_request result 
+  debug: var=digicert_request_result.json
+
+- debug: var=digicert_request_result.json.certificate_id
+
+- set_fact:
+    jmesquery_status: "[? certificate_id==`{{ digicert_request_result.json.certificate_id }}`].status"
+
+- name: Waiting for Digicert to issue the certificate for {{ common_name }} . It might take several minutes
+  uri:
+    url: "{{ digicert_url }}/order/certificate/status-changes?minutes=500"
+    method: GET
+    return_content: yes
+    headers:
+      Content-Type: application/json
+      X-DC-DEVKEY: "{{ digicert_api_key }}"
+  register: check_order_result
+  until: check_order_result.json.orders | json_query(jmesquery_status) is search "issued"
+  retries: 100
+  delay: 30
+
+- set_fact:
+    certificate_id: "{{ digicert_request_result.json.certificate_id }}"
+
+- name: display newly issued certificate id 
+  debug:
+    msg: The newly issued certificate_id is {{ certificate_id }}

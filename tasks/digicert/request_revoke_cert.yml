@@ -1,0 +1,27 @@
+---
+- assert:
+    that:
+      - common_name is defined
+      - existing_order_id is defined
+      - digicert_certificate_revoke_reason is defined
+
+- name: Display json data for certificate request call
+  debug:
+    msg: "{{ lookup('template', './digicert/revoke.j2') }}"
+
+- name: Request a revoke of existing certificate to Digicert with given CSR
+  uri:
+    url: "{{ digicert_url }}/order/certificate/{{ existing_order_id }}/revoke"
+    method: PUT
+    return_content: yes
+    headers:
+      Content-Type: application/json
+      X-DC-DEVKEY: "{{ digicert_api_key }}"
+    body_format: json
+    body: "{{ lookup('template', 'digicert/revoke.j2') | from_yaml }}"
+    status_code: 204
+  register: digicert_request_result
+  
+- name: debug | certificate_request result 
+  debug: var=digicert_request_result
+

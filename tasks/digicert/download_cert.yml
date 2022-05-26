@@ -1,0 +1,62 @@
+---
+- assert:
+    that:
+      - common_name is defined
+
+- name: Convert the wildcard cert name to star to be used in dir and file names.
+  set_fact:
+    common_name_filename: "{{ common_name | replace('*','star') }}"
+
+- include_tasks: digicert/get_order_info.yml
+
+- name: download the certificate
+  uri:
+    url: "{{ digicert_url }}/certificate/{{ digicert_order_info.certificate.id }}/download/format/{{ item.format }}"
+    method: GET
+    dest: "{{ certificate_store_directory }}/digicert-{{ item.format }}-{{ common_name_filename }}.zip"
+    return_content: yes
+    headers:
+      Content-Type: "{{ item.content_type }}"
+      X-DC-DEVKEY: "{{ digicert_api_key }}"
+  loop:
+    - { format: "default", content_type: "application/zip" }
+    - { format: "apache", content_type: "application/zip" }
+    - { format: "p7b", content_type: "application/x-pkcs7-certificates" }
+  become: yes
+
+- name: Unzip the downloaded default type certificate file
+  command: unzip -jo digicert-default-{{ common_name_filename }}.zip
+  become: yes
+  args:
+    warn: false
+    chdir: "{{ certificate_store_directory }}"
+
+- name: rename the obscure certificate file name from digicert
+  command: mv {{ common_name_filename | replace('.','_') }}.crt {{ common_name_filename }}.crt
+  args:
+    chdir: "{{ certificate_store_directory }}"
+  become: yes
+
+- name: Convert the certificate to pkcs12 format
+  openssl_pkcs12:
+    action: export
+    path: "{{ item }}"
+    friendly_name: "{{ common_name }}"
+    privatekey_path: "{{ certificate_store_directory }}/{{ common_name_filename }}.key"
+    certificate_path: "{{ certificate_store_directory }}/{{ common_name_filename }}.crt"
+    other_certificates:  "{{ certificate_store_directory }}/DigiCertCA.crt"
+    passphrase: "{{ netscaler_certificate_passphrase | default (omit) }}"
+    mode: '0664'
+    state: present
+  become: yes
+  with_items:
+    - "{{ certificate_store_directory }}/{{ common_name_filename }}.p12"
+    - "{{ certificate_store_directory }}/{{ common_name_filename }}_NetScaler.p12"
+
+- name: bundle all the contents of {{ certificate_store_directory }}
+  command: zip -r "digicert-bundle-{{ common_name_filename }}.zip" .
+  become: yes
+  args:
+    warn: false
+    chdir: "{{ certificate_store_directory }}"
+

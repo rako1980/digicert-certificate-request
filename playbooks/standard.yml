@@ -1,0 +1,13 @@
+---
+- hosts: localhost
+  gather_facts: false
+  
+  pre_tasks:
+    - assert:
+        that:
+          - task is defined
+
+  tasks:
+    - include_role:
+        name: certificate_request
+        tasks_from: "{{ task }}.yml"

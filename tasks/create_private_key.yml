@@ -1,0 +1,25 @@
+---
+- assert:
+    that:
+      - common_name is defined
+      - certificate_store_directory is defined
+    
+- name: Convert the wildcard cert name to star to be used in dir and file names.
+  set_fact:
+    common_name_filename: "{{ common_name | replace('*','star') }}"
+
+- name: ensure the private key exists for {{ common_name }}
+  stat:
+    path: "{{ certificate_store_directory }}/{{ common_name_filename }}.key"
+  register: check_private_key
+
+- name: debug | check private key
+  debug:
+    msg: "exists: {{ check_private_key.stat.exists }}. {{check_private_key.stat.path | default('',true)  }}"
+
+- name: Generate an OpenSSL private key (4096 bits, RSA)
+  openssl_privatekey:
+    path: "{{ certificate_store_directory }}/{{ common_name_filename }}.key"
+    mode: '0755'
+  become: true
+  when: not check_private_key.stat.exists

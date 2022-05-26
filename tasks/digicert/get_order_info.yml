@@ -1,0 +1,36 @@
+---
+- assert:
+    that:
+      - common_name is defined
+
+- name: Check if there is an existing order id for a {{ common_name }}
+  uri:
+    url: "{{ digicert_url }}/order/certificate"
+    method: GET
+    return_content: yes
+    headers:
+      Content-Type: application/json
+      X-DC-DEVKEY: "{{ digicert_api_key }}"
+  register: check_order_result
+
+- set_fact:
+    jmsquery_order: "[? certificate.common_name==`{{ common_name }}` && status==`issued` && is_renewed==`false`]" 
+
+- debug:
+    msg: Certificate exists with 'issued' status."
+  when: check_order_result.json.orders | json_query(jmsquery_order) | first is defined
+
+- set_fact:
+    digicert_order_info: "{{check_order_result.json.orders | json_query(jmsquery_order) | first}}"
+  when: check_order_result.json.orders | json_query(jmsquery_order) | first is defined
+
+- debug: var=digicert_order_info
+
+- set_fact:
+    existing_order_id: "{{ digicert_order_info.id | default('',true) }}"
+    existing_certificate_id: "{{ digicert_order_info.certificate.id | default('',true) }}"
+
+- debug:
+    msg:
+      - "Existing Order ID = {{ existing_order_id }}"
+      - "Existing Certificate ID = {{ existing_certificate_id }}"
